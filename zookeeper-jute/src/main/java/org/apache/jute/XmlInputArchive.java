@@ -42,6 +42,7 @@ class XmlInputArchive implements InputArchive {
             type = t;
             sb = new StringBuffer();
         }
+        // 将入参buf数组，offset开始，len个字符添加到sb
         public void addChars(char[] buf, int offset, int len) {
             sb.append(buf, offset, len);
         }
@@ -104,6 +105,7 @@ class XmlInputArchive implements InputArchive {
     }
     
     private class XmlIndex implements Index {
+        // 是否已完成
         public boolean done() {
             Value v = valList.get(vIdx);
             if ("/array".equals(v.getType())) {

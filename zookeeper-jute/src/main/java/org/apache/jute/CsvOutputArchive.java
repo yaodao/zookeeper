@@ -37,13 +37,17 @@ public class CsvOutputArchive implements OutputArchive {
     throws UnsupportedEncodingException {
         return new CsvOutputArchive(strm);
     }
-    
+
+    // 检查stream是否有错
     private void throwExceptionOnError(String tag) throws IOException {
+        // PrintStream 永远不会抛出 IOException；异常情况仅设置可通过 checkError 方法测试的内部标志。
         if (stream.checkError()) {
             throw new IOException("Error serializing "+tag);
         }
     }
- 
+
+    // 若isFirst为false，则将逗号写入stream
+    // 若isFirst为true，则置为false
     private void printCommaUnlessFirst() {
         if (!isFirst) {
             stream.print(",");
@@ -71,7 +75,8 @@ public class CsvOutputArchive implements OutputArchive {
     public void writeInt(int i, String tag) throws IOException {
         writeLong((long)i, tag);
     }
-    
+
+    // 将",l" 或者 "l" 写入stream，并检查stream是否有错误。
     public void writeLong(long l, String tag) throws IOException {
         printCommaUnlessFirst();
         stream.print(l);
@@ -107,15 +112,20 @@ public class CsvOutputArchive implements OutputArchive {
         }
         r.serialize(this, tag);
     }
-    
+
+    // 若tag不空，则将",s{" 或者 "s{" 写入stream
+    // 若tag为空，则无动作
     public void startRecord(Record r, String tag) throws IOException {
         if (tag != null && !"".equals(tag)) {
+            // 将逗号写入stream
             printCommaUnlessFirst();
             stream.print("s{");
             isFirst = true;
         }
     }
-    
+
+    // 若tag为空，则将"\n"写入stream，
+    // 若tag不空，则将"}"写入stream
     public void endRecord(Record r, String tag) throws IOException {
         if (tag == null || "".equals(tag)) {
             stream.print("\n");

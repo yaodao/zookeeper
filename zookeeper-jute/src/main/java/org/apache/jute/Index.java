@@ -32,6 +32,7 @@ package org.apache.jute;
  * </code>
  *
  */
+// 一个迭代器接口，是用于反序列化map的迭代器
 public interface Index {
     public boolean done();
     public void incr();

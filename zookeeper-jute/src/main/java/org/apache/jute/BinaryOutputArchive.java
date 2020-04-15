@@ -32,6 +32,8 @@ import java.util.TreeMap;
 public class BinaryOutputArchive implements OutputArchive {
     private ByteBuffer bb = ByteBuffer.allocate(1024);
 
+    // 输出流
+    // 用于将数据从任意 Java 基本类型转换为一系列字节，并将这些字节写入输出流
     private DataOutput out;
     
     public static BinaryOutputArchive getArchive(OutputStream strm) {
@@ -73,6 +75,8 @@ public class BinaryOutputArchive implements OutputArchive {
      * @param s the string to encode into utf8
      * @return utf8 byte sequence.
      */
+    // 将入参s的每个字符转成utf-8编码的byte数组，写入ByteBuffer，并返回该ByteBuffer对象
+    // 和str.getBytes("utf-8") 得到的数组一模一样。我试过。可能这个函数比较高效吧。
     final private ByteBuffer stringToByteBuffer(CharSequence s) {
         bb.clear();
         final int len = s.length();
@@ -99,16 +103,20 @@ public class BinaryOutputArchive implements OutputArchive {
         return bb;
     }
 
+    // 将入参s转成utf8编码，写入buffer，并把转后的byte数组长度写入out
     public void writeString(String s, String tag) throws IOException {
         if (s == null) {
             writeInt(-1, "len");
             return;
         }
         ByteBuffer bb = stringToByteBuffer(s);
+        // bb中有值的byte元素的个数
         writeInt(bb.remaining(), "len");
+        // 将bb数组中，从position开始，长度是limit的byte元素写入out
         out.write(bb.array(), bb.position(), bb.limit());
     }
 
+    // 将入参barr数组及其长度 写入out
     public void writeBuffer(byte barr[], String tag)
     throws IOException {
     	if (barr == null) {
@@ -126,7 +134,8 @@ public class BinaryOutputArchive implements OutputArchive {
     public void startRecord(Record r, String tag) throws IOException {}
     
     public void endRecord(Record r, String tag) throws IOException {}
-    
+
+    // 将入参v的长度写入out
     public void startVector(List<?> v, String tag) throws IOException {
     	if (v == null) {
     		writeInt(-1, tag);

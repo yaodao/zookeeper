@@ -27,10 +27,12 @@ import java.io.InputStream;
  *
  */
 public class BinaryInputArchive implements InputArchive {
+    // log用
     public static final String UNREASONBLE_LENGTH= "Unreasonable length = ";
     public static final int maxBuffer = Integer.getInteger("jute.maxbuffer", 0xfffff);
     private static final int extraMaxBuffer;
 
+    // 给成员变量extraMaxBuffer赋值
     static {
         final Integer configuredExtraMaxBuffer =
             Integer.getInteger("zookeeper.jute.maxbuffer.extrasize", maxBuffer);
@@ -41,6 +43,8 @@ public class BinaryInputArchive implements InputArchive {
             extraMaxBuffer = configuredExtraMaxBuffer;
         }
     }
+    // 输入流
+    // 用于从该输入流读取字节并构造成Java基本类型的值，包括String类型的值
     private DataInput in;
     private int maxBufferSize;
     private int extraMaxBufferSize;
@@ -71,7 +75,8 @@ public class BinaryInputArchive implements InputArchive {
         this.maxBufferSize = maxBufferSize;
         this.extraMaxBufferSize = extraMaxBufferSize;
     }
-    
+
+    // 从in流读取一个字节
     public byte readByte(String tag) throws IOException {
         return in.readByte();
     }
@@ -79,7 +84,8 @@ public class BinaryInputArchive implements InputArchive {
     public boolean readBool(String tag) throws IOException {
         return in.readBoolean();
     }
-    
+
+    // 从in流读取一个int值
     public int readInt(String tag) throws IOException {
         return in.readInt();
     }
@@ -95,21 +101,26 @@ public class BinaryInputArchive implements InputArchive {
     public double readDouble(String tag) throws IOException {
         return in.readDouble();
     }
-    
+
+    // 从in流读取String类型的值
     public String readString(String tag) throws IOException {
+        // String的长度
     	int len = in.readInt();
     	if (len == -1) return null;
         checkLength(len);
     	byte b[] = new byte[len];
+        // 从输入流中读取len个字节，并将它们存储在数组b中
     	in.readFully(b);
     	return new String(b, "UTF8");
     }
 
+    // 从in流读取byte数组
     public byte[] readBuffer(String tag) throws IOException {
         int len = readInt(tag);
         if (len == -1) return null;
         checkLength(len);
         byte[] arr = new byte[len];
+        // 从输入流中读取len个字节，并将它们存储在数组b中
         in.readFully(arr);
         return arr;
     }
@@ -121,8 +132,10 @@ public class BinaryInputArchive implements InputArchive {
     public void startRecord(String tag) throws IOException {}
     
     public void endRecord(String tag) throws IOException {}
-    
+
+    // 读取向量
     public Index startVector(String tag) throws IOException {
+        // 向量长度
         int len = readInt(tag);
         if (len == -1) {
         	return null;
@@ -131,7 +144,8 @@ public class BinaryInputArchive implements InputArchive {
     }
     
     public void endVector(String tag) throws IOException {}
-    
+
+    // 读取map
     public Index startMap(String tag) throws IOException {
         return new BinaryIndex(readInt(tag));
     }

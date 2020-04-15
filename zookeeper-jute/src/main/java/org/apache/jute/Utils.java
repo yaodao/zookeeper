@@ -38,6 +38,7 @@ public class Utils {
      * @param twoarray Second buffer
      * @return true if one and two contain exactly the same content, else false.
      */
+    // 比较两个byte数组，相等返回true，否则返回false
     public static boolean bufEquals(byte onearray[], byte twoarray[] ) {
     	if (onearray == twoarray) return true;
         boolean ret = (onearray.length == twoarray.length);
@@ -60,6 +61,7 @@ public class Utils {
      * @param s 
      * @return 
      */
+    // 将入参s中的每个特殊字符，都替换一下，返回处理后的串
     static String toXMLString(String s) {
         if (s == null)
             return "";
@@ -83,7 +85,8 @@ public class Utils {
         }
         return sb.toString();
     }
-    
+
+    // 计算入参ch 与 '0', 'A', 'a'之间的距离，返回该整数值。
     static private int h2c(char ch) {
       if (ch >= '0' && ch <= '9') {
         return ch - '0';
@@ -100,13 +103,16 @@ public class Utils {
      * @param s 
      * @return 
      */
+    // 将入参s中每个类似 %**的串，转换成一个char，并返回转换后的s
     static String fromXMLString(String s) {
         StringBuilder sb = new StringBuilder();
         for (int idx = 0; idx < s.length();) {
           char ch = s.charAt(idx++);
+          // 若ch是%，则把%和之后的两个char，转换成一个char
           if (ch == '%') {
             char ch1 = s.charAt(idx++);
             char ch2 = s.charAt(idx++);
+            // 将两个char转成一个char
             char res = (char)(h2c(ch1)*16 + h2c(ch2));
             sb.append(res);
           } else {
@@ -122,6 +128,7 @@ public class Utils {
      * @param s 
      * @return 
      */
+    // 将入参s中的每个特殊字符转成%**的形式，并返回处理后的s（返回的s加前缀单引号）
     static String toCSVString(String s) {
         if (s == null)
             return "";
@@ -163,6 +170,7 @@ public class Utils {
      * @throws java.io.IOException 
      * @return 
      */
+    // 将入参s中所有类似%**的三个字符，逐个转换成一个字符，并返回转化后的字符串s。
     static String fromCSVString(String s) throws IOException {
         if (s.charAt(0) != '\'') {
             throw new IOException("Error deserializing string.");
@@ -171,10 +179,12 @@ public class Utils {
         StringBuilder sb = new StringBuilder(len-1);
         for (int i = 1; i < len; i++) {
             char c = s.charAt(i);
+            // 如果c是%，则需要看下紧接着的后面两个字符是啥，将%**三个字符转成一个字符
             if (c == '%') {
                 char ch1 = s.charAt(i+1);
                 char ch2 = s.charAt(i+2);
                 i += 2;
+                // 根据ch1和ch2具体值，转换成一个字符，并append到sb。
                 if (ch1 == '0' && ch2 == '0') { sb.append('\0'); }
                 else if (ch1 == '0' && ch2 == 'A') { sb.append('\n'); }
                 else if (ch1 == '0' && ch2 == 'D') { sb.append('\r'); }
@@ -183,6 +193,7 @@ public class Utils {
                 else if (ch1 == '2' && ch2 == '5') { sb.append('%'); }
                 else {throw new IOException("Error deserializing string.");}
             } else {
+                // 普通字符直接append
                 sb.append(c);
             }
         }
@@ -194,12 +205,14 @@ public class Utils {
      * @param s 
      * @return 
      */
+    // 将入参barr中的每个元素都转成16进制串，并组成字符串返回
     static String toXMLBuffer(byte barr[]) {
         if (barr == null || barr.length == 0) {
             return "";
         }
         StringBuilder sb = new StringBuilder(2*barr.length);
         for (int idx = 0; idx < barr.length; idx++) {
+            // 将byte转成十六进制串，并append到sb
             sb.append(Integer.toHexString(barr[idx]));
         }
         return sb.toString();
@@ -211,6 +224,7 @@ public class Utils {
      * @throws java.io.IOException 
      * @return 
      */
+    // 将入参s中 每两个字符作为一个16进制串，转成十进制的数值存入byte，并返回byte数组
     static byte[] fromXMLBuffer(String s)
     throws IOException {
         ByteArrayOutputStream stream =  new ByteArrayOutputStream();
@@ -220,6 +234,7 @@ public class Utils {
         for (int idx = 0; idx < blen; idx++) {
             char c1 = s.charAt(2*idx);
             char c2 = s.charAt(2*idx+1);
+            // 将""+c1+c2这个字符串 按16进制进行解析，解析成带符号的十进制byte值（也就是把""+c1+c2 这个串看成是16进制串，得到它对应的十进制的值）
             barr[idx] = Byte.parseByte(""+c1+c2, 16);
         }
         stream.write(barr);
@@ -231,6 +246,7 @@ public class Utils {
      * @param buf 
      * @return 
      */
+    // 将入参barr中的每个元素都转成16进制串，并组成字符串返回（返回的字符串带前缀#）
     static String toCSVBuffer(byte barr[]) {
         if (barr == null || barr.length == 0) {
             return "";
@@ -238,6 +254,7 @@ public class Utils {
         StringBuilder sb = new StringBuilder(barr.length + 1);
         sb.append('#');
         for(int idx = 0; idx < barr.length; idx++) {
+            // 将byte转成十六进制串，并append到sb
             sb.append(Integer.toHexString(barr[idx]));
         }
         return sb.toString();
@@ -250,6 +267,7 @@ public class Utils {
      * @throws java.io.IOException 
      * @return Deserialized ByteArrayOutputStream
      */
+    // 将入参s中 每两个字符作为一个16进制串，转成十进制的数值存入byte，并返回byte数组
     static byte[] fromCSVBuffer(String s)
     throws IOException {
         if (s.charAt(0) != '#') {
@@ -262,11 +280,21 @@ public class Utils {
         for (int idx = 0; idx < blen; idx++) {
             char c1 = s.charAt(2*idx+1);
             char c2 = s.charAt(2*idx+2);
+            // 将""+c1+c2这个字符串 按16进制进行解析，解析成带符号的十进制byte值（也就是把""+c1+c2 这个串看成是16进制串，得到它对应的十进制的值）
+            // 例如：
+            // Byte.parseByte("-7b", 16); 得到byte=-123，
+            // Byte.parseByte("7b", 16); 得到byte=123
             barr[idx] = Byte.parseByte(""+c1+c2, 16);
         }
         stream.write(barr);
         return stream.toByteArray();
     }
+
+    // 比较两个byte数组的大小，（逐个byte进行比较）
+    // 若b1比b2大，返回1，否则返回-1
+    // 者b2是b1的子集，则返回1
+    // 若b1是b2的子集，则返回-1
+    // 若b1与b2相等，返回0
     public static int compareBytes(byte b1[], int off1, int len1, byte b2[], int off2, int len2) {
         int i;
         for(i=0; i < len1 && i < len2; i++) {

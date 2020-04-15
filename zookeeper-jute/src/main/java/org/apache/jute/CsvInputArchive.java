@@ -28,10 +28,11 @@ import java.io.UnsupportedEncodingException;
  *
  */
 class CsvInputArchive implements InputArchive {
-    
+    // 可读取字符的流（允许字符被重新推回流中）
     private PushbackReader stream;
     
     private class CsvIndex implements Index {
+        // 从stream读取一个字符，判断该字符是否为"}"，是则返回true
         public boolean done() {
             char c = '\0';
             try {
@@ -43,7 +44,8 @@ class CsvInputArchive implements InputArchive {
         }
         public void incr() {}
     }
-    
+
+    // 从stream读取一个字段 （入参tag就是log用）
     private String readField(String tag) throws IOException {
         try {
             StringBuilder buf = new StringBuilder();
@@ -51,10 +53,14 @@ class CsvInputArchive implements InputArchive {
                 char c = (char) stream.read();
                 switch (c) {
                     case ',':
+                        // 遇到逗号，则返回已读取的值
                         return buf.toString();
                     case '}':
                     case '\n':
                     case '\r':
+                        // 遇到以上几个符号，则返回已读取的值
+
+                        // 推回缓冲区，也就说下次read还是读到这个字符。
                         stream.unread(c);
                         return buf.toString();
                     default:
@@ -72,6 +78,7 @@ class CsvInputArchive implements InputArchive {
     }
     
     /** Creates a new instance of CsvInputArchive */
+    // 创建一个CsvInputArchive对象（就是new一个输入流 赋值给成员变量stream）
     public CsvInputArchive(InputStream in)
     throws UnsupportedEncodingException {
         stream = new PushbackReader(new InputStreamReader(in, "UTF-8"));
@@ -89,7 +96,8 @@ class CsvInputArchive implements InputArchive {
     public int readInt(String tag) throws IOException {
         return (int) readLong(tag);
     }
-    
+
+    // 从stream读取一个long值（入参tag用于log）
     public long readLong(String tag) throws IOException {
         String sval = readField(tag);
         try {
@@ -99,11 +107,13 @@ class CsvInputArchive implements InputArchive {
             throw new IOException("Error deserializing "+tag);
         }
     }
-    
+
+    // 从stream读取一个float值（入参tag用于log）
     public float readFloat(String tag) throws IOException {
         return (float) readDouble(tag);
     }
-    
+
+    // 从stream读取一个double值（入参tag用于log）
     public double readDouble(String tag) throws IOException {
         String sval = readField(tag);
         try {
@@ -113,13 +123,15 @@ class CsvInputArchive implements InputArchive {
             throw new IOException("Error deserializing "+tag);
         }
     }
-    
+
+    // 从stream读取一个字符串，并将其中的%**字符替换成对应的字符
     public String readString(String tag) throws IOException {
         String sval = readField(tag);
         return Utils.fromCSVString(sval);
         
     }
-    
+
+    // 从stream读取一个字符串，并将其中每两个字符转成一个byte，返回转化后的byte数组
     public byte[] readBuffer(String tag) throws IOException {
         String sval = readField(tag);
         return Utils.fromCSVBuffer(sval);
@@ -128,7 +140,8 @@ class CsvInputArchive implements InputArchive {
     public void readRecord(Record r, String tag) throws IOException {
         r.deserialize(this, tag);
     }
-    
+
+    // 当入参tag不为空时， 若stream的前两个字符不是's'或'{' 则抛出异常。
     public void startRecord(String tag) throws IOException {
         if (tag != null && !"".equals(tag)) {
             char c1 = (char) stream.read();
@@ -138,7 +151,9 @@ class CsvInputArchive implements InputArchive {
             }
         }
     }
-    
+
+    // 当入参tag为空时， 若stream的第一个字符不是'\n'或'\r' 则抛出异常。
+    // 当入参tag不为空，若stream的第一个字符不是'}' 则抛出异常
     public void endRecord(String tag) throws IOException {
         char c = (char) stream.read();
         if (tag == null || "".equals(tag)) {

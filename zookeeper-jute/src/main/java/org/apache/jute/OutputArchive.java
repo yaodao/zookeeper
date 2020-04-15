@@ -26,6 +26,8 @@ import java.util.TreeMap;
  * Interface that alll the serializers have to implement.
  *
  */
+// 所有序列化器都需要实现此接口 （在zookeeper中序列化器就是将Record对象变为二进制数据的过程）
+// 可能看不出来这是个序列化器，因为从代码来看，这就是一个输出流，可以向里面写入各种类型的数据。
 public interface OutputArchive {
     public void writeByte(byte b, String tag) throws IOException;
     public void writeBool(boolean b, String tag) throws IOException;

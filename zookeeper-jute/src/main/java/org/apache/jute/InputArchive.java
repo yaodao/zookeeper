@@ -24,6 +24,8 @@ import java.io.IOException;
  * Interface that all the Deserializers have to implement.
  *
  */
+// 所有反序列器都需要实现的接口（在zookeeper中反序列化器就是将二进制数据变为Record对象的过程）
+// 可能看不出来这是个反序列器，因为从代码来看，这就是一个输入流，可以从里面读取出各种类型的数据
 public interface InputArchive {
     public byte readByte(String tag) throws IOException;
     public boolean readBool(String tag) throws IOException;

@@ -31,11 +31,13 @@ import java.util.TreeMap;
 class XmlOutputArchive implements OutputArchive {
 
     private PrintStream stream;
-    
+
+    // 缩进层次（1表示第一层节点，2表示第二层节点，依次类推）
     private int indent = 0;
     
     private Stack<String> compoundStack;
-    
+
+    // 生成缩进串（就是生成一定数量的空格）
     private void putIndent() {
         StringBuilder sb = new StringBuilder("");
         for (int idx = 0; idx < indent; idx++) {
@@ -43,15 +45,18 @@ class XmlOutputArchive implements OutputArchive {
         }
         stream.print(sb.toString());
     }
-    
+
+    // 缩进层次+1
     private void addIndent() {
         indent++;
     }
-    
+
+    // 缩进层次-1
     private void closeIndent() {
         indent--;
     }
-    
+
+    // 打印文件头格式
     private void printBeginEnvelope(String tag) {
         if (!compoundStack.empty()) {
             String s = compoundStack.peek();
@@ -72,7 +77,8 @@ class XmlOutputArchive implements OutputArchive {
             stream.print("<value>");
         }
     }
-    
+
+    // 打印文件尾格式
     private void printEndEnvelope(String tag) {
         if (!compoundStack.empty()) {
             String s = compoundStack.peek();
@@ -139,7 +145,8 @@ class XmlOutputArchive implements OutputArchive {
         stream = new PrintStream(out);
         compoundStack = new Stack<String>();
     }
-    
+
+    // 写Byte类型
     public void writeByte(byte b, String tag) throws IOException {
         printBeginEnvelope(tag);
         stream.print("<ex:i1>");
@@ -208,13 +215,15 @@ class XmlOutputArchive implements OutputArchive {
     public void writeRecord(Record r, String tag) throws IOException {
         r.serialize(this, tag);
     }
-    
+
+    // 开始写Record类型
     public void startRecord(Record r, String tag) throws IOException {
         insideRecord(tag);
         stream.print("<struct>\n");
         addIndent();
     }
-    
+
+    // 结束写Record类型
     public void endRecord(Record r, String tag) throws IOException {
         closeIndent();
         putIndent();
