@@ -27,9 +27,11 @@ import java.net.InetSocketAddress;
  */
 public class NetUtils {
 
+    // 将入参addr对象转成 "ip:port" 形式的字符串返回。
     public static String formatInetAddr(InetSocketAddress addr) {
         InetAddress ia = addr.getAddress();
 
+        // 格式化串，返回串类似 "www.baidu.com:8081"
         if (ia == null) {
             return String.format("%s:%s", addr.getHostString(), addr.getPort());
         }
@@ -37,6 +39,7 @@ public class NetUtils {
         if (ia instanceof Inet6Address) {
             return String.format("[%s]:%s", ia.getHostAddress(), addr.getPort());
         } else {
+            // 返回串类似 "39.156.66.14:8081"
             return String.format("%s:%s", ia.getHostAddress(), addr.getPort());
         }
     }

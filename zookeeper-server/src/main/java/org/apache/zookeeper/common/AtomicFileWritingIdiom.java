@@ -31,6 +31,11 @@ import java.io.Writer;
  *  Based on the org.apache.zookeeper.server.quorum.QuorumPeer.writeLongToFile(...) idiom
  *  using the HDFS AtomicFileOutputStream class.
  */
+
+/**
+ * 本类用于对文件执行原子写操作。
+ * 若在写的过程中出现错误，则原文件（若存在）不变
+ */
 public class AtomicFileWritingIdiom {
 
     public static interface OutputStreamStatement {
@@ -45,25 +50,31 @@ public class AtomicFileWritingIdiom {
 
     }
 
+    // 入参osStmt向targetFile中写入数据
     public AtomicFileWritingIdiom(File targetFile, OutputStreamStatement osStmt)  throws IOException {
         this(targetFile, osStmt, null);
     }
 
+    // 入参wStmt向targetFile中写入数据
     public AtomicFileWritingIdiom(File targetFile, WriterStatement wStmt)  throws IOException {
         this(targetFile, null, wStmt);
     }
 
+    // 入参osStmt对象或者wStmt对象，借助AtomicFileOutputStream流对象， 向targetFile中写入数据，之后关闭流对象
     private AtomicFileWritingIdiom(File targetFile, OutputStreamStatement osStmt, WriterStatement wStmt)  throws IOException {
         AtomicFileOutputStream out = null;
         boolean error = true;
         try {
+            // new一个针对targetFile的输出流对象out
             out = new AtomicFileOutputStream(targetFile);
             if (wStmt == null) {
                 // execute output stream operation
+                // 这里可以间接执行底层流out的write方法
                 osStmt.write(out);
             } else {
                 BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(out));
                 // execute writer operation and flush
+                // 这里可以间接执行底层流bw的write方法
                 wStmt.write(bw);
                 bw.flush();
             }

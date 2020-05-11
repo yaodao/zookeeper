@@ -30,6 +30,7 @@ public class StringUtils {
      * the resulting List.
      *
      */
+    // 和String类的split功能类似， 区别是：去掉每个元素前后的空格（空元素不存）；返回的是不可变的list
     public static List<String> split(String value, String separator) {
         String[] splits = value.split(separator);
         List<String> results = new ArrayList<String>();
@@ -47,13 +48,15 @@ public class StringUtils {
      * into a single string, where the original strings are separated using 
      * the given delimiter.
      *
-     */ 
+     */
+    // 将list中元素用delim连起来
     public static String joinStrings(List<String> list, String delim)
     {
         if (list == null)
             return null;
 
        StringBuilder builder = new StringBuilder(list.get(0));
+       // subList的from和to相等，则返回空list，不是null
         for (String s : list.subList(1, list.size())) {
             builder.append(delim).append(s);
         }

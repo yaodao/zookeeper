@@ -49,9 +49,11 @@ import org.slf4j.LoggerFactory;
 public class FileTxnSnapLog {
     //the direcotry containing the
     //the transaction logs
+    // 配置文件中的dataLogDir
     private final File dataDir;
     //the directory containing the
     //the snapshot directory
+    // 配置文件中的dataDir
     private final File snapDir;
     private TxnLog txnLog;
     private SnapShot snapLog;
@@ -96,24 +98,31 @@ public class FileTxnSnapLog {
     /**
      * the constructor which takes the datadir and
      * snapdir.
-     * @param dataDir the transaction directory
-     * @param snapDir the snapshot directory
+     * @param dataDir the transaction directory ，配置文件中的dataLogDir
+     * @param snapDir the snapshot directory ，配置文件中的dataDir
      */
+    // 构造一个FileTxnSnapLog对象，
+    // 包括： 创建入参指示的目录，并检验其中文件是否合理； 生成对象为成员变量txnLog和snapLog赋值
     public FileTxnSnapLog(File dataDir, File snapDir) throws IOException {
         LOG.debug("Opening datadir:{} snapDir:{}", dataDir, snapDir);
 
+        // 定位到 "/root/zookeeper-3.4.14/logs/version-2/"文件夹
         this.dataDir = new File(dataDir, version + VERSION);
+        // 定位到 "/root/zookeeper-3.4.14/data/version-2/"文件夹
         this.snapDir = new File(snapDir, version + VERSION);
 
         // by default create snap/log dirs, but otherwise complain instead
         // See ZOOKEEPER-1161 for more details
+        //  取系统配置 "zookeeper.datadir.autocreate" 的值，默认是true，自动创建snap/log 目录
         boolean enableAutocreate = Boolean.valueOf(
                 System.getProperty(ZOOKEEPER_DATADIR_AUTOCREATE,
                         ZOOKEEPER_DATADIR_AUTOCREATE_DEFAULT));
 
+        // 从系统配置取"zookeeper.snapshot.trust.empty" 的值
         trustEmptySnapshot = Boolean.getBoolean(ZOOKEEPER_SNAPSHOT_TRUST_EMPTY);
         LOG.info(ZOOKEEPER_SNAPSHOT_TRUST_EMPTY + " : " + trustEmptySnapshot);
 
+        // 若dataDir目录不存在，则自动创建
         if (!this.dataDir.exists()) {
             if (!enableAutocreate) {
                 throw new DatadirException("Missing data directory "
@@ -154,6 +163,7 @@ public class FileTxnSnapLog {
 
         // check content of transaction log and snapshot dirs if they are two different directories
         // See ZOOKEEPER-2967 for more details
+        // 检测两个目录里的文件名是否正确
         if(!this.dataDir.getPath().equals(this.snapDir.getPath())){
             checkLogDir();
             checkSnapDir();
@@ -167,25 +177,31 @@ public class FileTxnSnapLog {
         txnLog.setServerStats(serverStats);
     }
 
+    // 检验配置文件配置的dataLogDir目录，是否有snapshot文件，有则抛出异常（也就是说dataLogDir目录，不能有snapshot文件）
     private void checkLogDir() throws LogDirContentCheckException {
+        // 过滤dataDir目录的文件，留下名字以"snapshot."开头的文件
         File[] files = this.dataDir.listFiles(new FilenameFilter() {
             @Override
             public boolean accept(File dir, String name) {
                 return Util.isSnapshotFileName(name);
             }
         });
+        // dataLogDir 目录不能有snapshot文件
         if (files != null && files.length > 0) {
             throw new LogDirContentCheckException("Log directory has snapshot files. Check if dataLogDir and dataDir configuration is correct.");
         }
     }
 
+    // 检验配置的dataDir目录，是否有log文件，有则抛出异常（也就是说dataDir目录，不能有log文件）
     private void checkSnapDir() throws SnapDirContentCheckException {
+        // 过滤snapDir目录的文件，留下名字以"log."开头的文件
         File[] files = this.snapDir.listFiles(new FilenameFilter() {
             @Override
             public boolean accept(File dir, String name) {
                 return Util.isLogFileName(name);
             }
         });
+        // snapDir 目录不能有log文件，有则抛出异常
         if (files != null && files.length > 0) {
             throw new SnapDirContentCheckException("Snapshot directory has log files. Check if dataLogDir and dataDir configuration is correct.");
         }
@@ -457,8 +473,10 @@ public class FileTxnSnapLog {
      * the most recent in front
      * @throws IOException
      */
+    // 找最近的n个snapshots文件
     public List<File> findNRecentSnapshots(int n) throws IOException {
         FileSnap snaplog = new FileSnap(snapDir);
+        // 取最近的n个snapshot文件
         return snaplog.findNRecentSnapshots(n);
     }
 
@@ -471,6 +489,7 @@ public class FileTxnSnapLog {
      * zxid
      * @return
      */
+    // 查找zxid之前的那个日志文件。并返回此日志和所有后续日志。结果按文件名中的zxid排序，升序排列。
     public File[] getSnapshotLogs(long zxid) {
         return FileTxnLog.getLogFiles(dataDir.listFiles(), zxid);
     }

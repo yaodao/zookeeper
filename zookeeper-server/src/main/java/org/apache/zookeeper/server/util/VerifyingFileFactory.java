@@ -22,10 +22,13 @@ import java.io.File;
 
 import org.slf4j.Logger;
 
+// 验证文件是否有效的类，感觉这个验证文件的用法可以借鉴引申
 public final class VerifyingFileFactory {
 
+    // 需要验证的项
     private final boolean warnForRelativePath;
     private final boolean failForNonExistingPath;
+
     private final Logger log;
 
     public VerifyingFileFactory(Builder builder){
@@ -35,12 +38,15 @@ public final class VerifyingFileFactory {
         assert(log != null);
     }
 
+    // 创建file对象，并验证该file对象是否有效，若有效，则返回该file对象。否则抛出异常
     public File create(String path) {
         File file = new File(path);
         return validate(file);
     }
 
+    // 验证file对象是否满足条件
     public File validate(File file) {
+        // 验证
         if(warnForRelativePath) doWarnForRelativePath(file);
         if(failForNonExistingPath) doFailForNonExistingPath(file);
         return file;
@@ -53,6 +59,7 @@ public final class VerifyingFileFactory {
         }
     }
 
+    // 若file对象的路径是绝对路径 或者 路径以./开头，则返回，否则warn
     private void doWarnForRelativePath(File file) {
         if(file.isAbsolute()) return;
         if(file.getPath().substring(0, 2).equals("."+File.separator)) return;

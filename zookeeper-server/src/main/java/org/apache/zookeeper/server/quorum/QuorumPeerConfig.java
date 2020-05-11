@@ -63,7 +63,9 @@ public class QuorumPeerConfig {
     private static final int UNSET_SERVERID = -1;
     public static final String nextDynamicConfigFileSuffix = ".dynamic.next";
 
+    // 是否允许单机模式（standalone）
     private static boolean standaloneEnabled = true;
+    // 是否可以动态更改配置
     private static boolean reconfigEnabled = false;
 
     protected InetSocketAddress clientPortAddress;
@@ -73,8 +75,11 @@ public class QuorumPeerConfig {
     protected boolean sslQuorumReloadCertFiles = false;
     protected File dataDir;
     protected File dataLogDir;
+    // 动态配置文件的全路径
     protected String dynamicConfigFileStr = null;
+    // zoo.cfg的全路径地址
     protected String configFileStr = null;
+    // zoo.cfg里配置的tickTime
     protected int tickTime = ZooKeeperServer.DEFAULT_TICK_TIME;
     protected int maxClientCnxns = 60;
     /** defaults to -1 if not set explicitly */
@@ -90,6 +95,7 @@ public class QuorumPeerConfig {
     protected int electionPort = 2182;
     protected boolean quorumListenOnAllIPs = false;
 
+    // 就是myid文件内的值
     protected long serverId = UNSET_SERVERID;
 
     protected QuorumVerifier quorumVerifier = null, lastSeenQuorumVerifier = null;
@@ -97,6 +103,7 @@ public class QuorumPeerConfig {
     protected int purgeInterval = 0;
     protected boolean syncEnabled = true;
 
+    // 角色默认是 PARTICIPANT
     protected LearnerType peerType = LearnerType.PARTICIPANT;
 
     /**
@@ -135,6 +142,7 @@ public class QuorumPeerConfig {
         LOG.info("Reading configuration from: " + path);
        
         try {
+            // 创建File对象，并验证其是否有效 （这里new的是Builder对象， .build()之后才构造了个VerifyingFileFactory对象）
             File configFile = (new VerifyingFileFactory.Builder(LOG)
                 .warnForRelativePath()
                 .failForNonExistingPath()
@@ -143,12 +151,14 @@ public class QuorumPeerConfig {
             Properties cfg = new Properties();
             FileInputStream in = new FileInputStream(configFile);
             try {
+                // 把zoo.cfg的内容读取到Properties对象中
                 cfg.load(in);
                 configFileStr = path;
             } finally {
                 in.close();
             }
-            
+
+            // 从入参cfg中取配置项，赋给当前对象的各个成员变量。
             parseProperties(cfg);
         } catch (IOException e) {
             throw new ConfigException("Error processing " + path, e);
@@ -233,6 +243,7 @@ public class QuorumPeerConfig {
      * @throws IOException
      * @throws ConfigException
      */
+    // 从入参zkProp中取配置值，赋给当前对象的各个成员变量。
     public void parseProperties(Properties zkProp)
     throws IOException, ConfigException {
         int clientPort = 0;
@@ -253,25 +264,60 @@ public class QuorumPeerConfig {
                 localSessionsEnabled = Boolean.parseBoolean(value);
             } else if (key.equals("localSessionsUpgradingEnabled")) {
                 localSessionsUpgradingEnabled = Boolean.parseBoolean(value);
-            } else if (key.equals("clientPortAddress")) {
+            }
+            /**
+             * 对于多网卡的机器，可以为每个IP指定不同的监听端口。默认情况是所有IP都监听 clientPort指定的端口。
+             * 限制客户端连接到指定的接收信息的地址上。
+             * 默认情况下，一个zookeeper服务器会监听在所有的网络接口地址上等待客户端的连接。
+             * 有些服务器配置了多个网络接口，其中一个网络接口用于内网通信，另一个网络接口用于公网通信，
+             * 如果你并不希望服务器在公网接口接受客户端的连接，只需要设置clientPortAddress选项为内网接口的地址。
+             */
+            else if (key.equals("clientPortAddress")) {
                 clientPortAddress = value.trim();
             } else if (key.equals("secureClientPort")) {
                 secureClientPort = Integer.parseInt(value);
             } else if (key.equals("secureClientPortAddress")){
                 secureClientPortAddress = value.trim();
-            } else if (key.equals("tickTime")) {
+            }
+            // ZK中的一个时间单元。ZK中所有时间都是以这个时间单元为基础，进行整数倍的配置。例如，session的最小超时时间是2*tickTime。
+            else if (key.equals("tickTime")) {
                 tickTime = Integer.parseInt(value);
-            } else if (key.equals("maxClientCnxns")) {
+            }
+            /**
+             * 单个客户端与单台服务器之间的连接数的限制，是ip级别的，默认是60，如果设置为0，那么表明不作任何限制。
+             * 请注意这个限制的使用范围，仅仅是单个客户端与单台ZK服务器之间的连接数限制，
+             * 不是针对指定客户端IP，也不是ZK集群的连接数限制，也不是单台ZK对所有客户端的连接数限制。
+             */
+            else if (key.equals("maxClientCnxns")) {
                 maxClientCnxns = Integer.parseInt(value);
-            } else if (key.equals("minSessionTimeout")) {
+            }
+            // Session超时时间限制，如果客户端设置的超时时间不在这个范围，那么会被强制设置为最大或最小时间范围内。
+            // 默认的Session超时时间是在2 * tickTime ~ 20 * tickTime 这个范围
+            else if (key.equals("minSessionTimeout")) {
                 minSessionTimeout = Integer.parseInt(value);
             } else if (key.equals("maxSessionTimeout")) {
                 maxSessionTimeout = Integer.parseInt(value);
-            } else if (key.equals("initLimit")) {
+            }
+            /**
+             * Follower在启动过程中，会从Leader同步所有最新数据，然后确定自己能够对外服务的起始状态。
+             * Leader允许Follower在initLimit时间内完成这个工作。
+             * 通常情况下，我们不用太在意这个参数的设置。
+             * 如果ZK集群的数据量确实很大了，Follower在启动的时候，从Leader上同步数据的时间也会相应变长，
+             * 因此在这种情况下，有必要适当调大这个参数了。
+             */
+            else if (key.equals("initLimit")) {
                 initLimit = Integer.parseInt(value);
-            } else if (key.equals("syncLimit")) {
+            }
+            /**
+             * 在运行过程中，Leader负责与ZK集群中所有机器进行通信，例如通过一些心跳检测机制，来检测机器的存活状态。
+             * 如果Leader发出心跳包在syncLimit之后，还没有从Follower那里收到响应，那么就认为这个Follower已经不在线了。
+             * 注意：不要把这个参数设置得过大，否则可能会掩盖一些问题。
+             */
+            else if (key.equals("syncLimit")) {
                 syncLimit = Integer.parseInt(value);
-            } else if (key.equals("electionAlg")) {
+            }
+            // leader选举算法，只有一种算法“TCP-based version of fast leader election”
+            else if (key.equals("electionAlg")) {
                 electionAlg = Integer.parseInt(value);
             } else if (key.equals("quorumListenOnAllIPs")) {
                 quorumListenOnAllIPs = Boolean.parseBoolean(value);
@@ -286,11 +332,17 @@ public class QuorumPeerConfig {
                 }
             } else if (key.equals( "syncEnabled" )) {
                 syncEnabled = Boolean.parseBoolean(value);
-            } else if (key.equals("dynamicConfigFile")){
+            }
+            // 动态配置文件
+            else if (key.equals("dynamicConfigFile")){
                 dynamicConfigFileStr = value;
-            } else if (key.equals("autopurge.snapRetainCount")) {
+            }
+            // 指定了需要保留的文件数目。默认是保留3个
+            else if (key.equals("autopurge.snapRetainCount")) {
                 snapRetainCount = Integer.parseInt(value);
-            } else if (key.equals("autopurge.purgeInterval")) {
+            }
+            // ZK提供了自动清理事务日志和快照文件的功能，这个参数指定了清理频率，单位是小时，需要配置一个1或更大的整数，默认是0，表示不开启自动清理功能。
+            else if (key.equals("autopurge.purgeInterval")) {
                 purgeInterval = Integer.parseInt(value);
             } else if (key.equals("standaloneEnabled")) {
                 if (value.toLowerCase().equals("true")) {
@@ -300,7 +352,9 @@ public class QuorumPeerConfig {
                 } else {
                     throw new ConfigException("Invalid option " + value + " for standalone mode. Choose 'true' or 'false.'");
                 }
-            } else if (key.equals("reconfigEnabled")) {
+            }
+            // 是否可以动态更改配置
+            else if (key.equals("reconfigEnabled")) {
                 if (value.toLowerCase().equals("true")) {
                     setReconfigEnabled(true);
                 } else if (value.toLowerCase().equals("false")) {
@@ -331,9 +385,13 @@ public class QuorumPeerConfig {
             } else if (key.equals("quorum.cnxn.threads.size")) {
                 quorumCnxnThreadsSize = Integer.parseInt(value);
             } else {
+                // 将配置项设置到系统属性中。
                 System.setProperty("zookeeper." + key, value);
             }
         }
+        // 以上就将zoo.cfg中的配置的值赋值给了当前对象的成员变量。
+
+        // 以下是验证，解析配置文件得到的成员变量值是否有效。
 
         if (!quorumEnableSasl && quorumServerRequireSasl) {
             throw new IllegalArgumentException(
@@ -360,6 +418,7 @@ public class QuorumPeerConfig {
         // Reset to MIN_SNAP_RETAIN_COUNT if invalid (less than 3)
         // PurgeTxnLog.purge(File, File, int) will not allow to purge less
         // than 3.
+        // snapRetainCount最小是3
         if (snapRetainCount < MIN_SNAP_RETAIN_COUNT) {
             LOG.warn("Invalid autopurge.snapRetainCount: " + snapRetainCount
                     + ". Defaulting to " + MIN_SNAP_RETAIN_COUNT);
@@ -378,11 +437,16 @@ public class QuorumPeerConfig {
             if (clientPortAddress != null) {
                 throw new IllegalArgumentException("clientPortAddress is set but clientPort is not set");
             }
-        } else if (clientPortAddress != null) {
+        }
+        //  若配置文件中配置了clientPortAddress，则取它的ip地址 与clientPort一起构成一个InetSocketAddress对象
+        else if (clientPortAddress != null) {
             this.clientPortAddress = new InetSocketAddress(
                     InetAddress.getByName(clientPortAddress), clientPort);
             LOG.info("clientPortAddress is {}", formatInetAddr(this.clientPortAddress));
-        } else {
+        }
+        // 若配置文件中配置了clientPort，但没有配置clientPortAddress
+        else {
+            // 生成的InetSocketAddress对象，ip=0.0.0.0 端口是clientPort
             this.clientPortAddress = new InetSocketAddress(clientPort);
             LOG.info("clientPortAddress is {}", formatInetAddr(this.clientPortAddress));
         }
@@ -408,6 +472,7 @@ public class QuorumPeerConfig {
             throw new IllegalArgumentException("tickTime is not set");
         }
 
+        // session的默认最小和最大时间。
         minSessionTimeout = minSessionTimeout == -1 ? tickTime * 2 : minSessionTimeout;
         maxSessionTimeout = maxSessionTimeout == -1 ? tickTime * 20 : maxSessionTimeout;
 
@@ -418,11 +483,15 @@ public class QuorumPeerConfig {
 
         // backward compatibility - dynamic configuration in the same file as
         // static configuration params see writeDynamicConfig()
+        // 向后兼容性——与静态配置参数在同一个文件中的动态配置参见writeDynamicConfig()
         if (dynamicConfigFileStr == null) {
             setupQuorumPeerConfig(zkProp, true);
+            // 集群 且 可以动态更改配置，则备份文件。
             if (isDistributed() && isReconfigEnabled()) {
                 // we don't backup static config for standalone mode.
                 // we also don't backup if reconfig feature is disabled.
+                // standalone模式不备份文件， reconfigEnabled = false 也不备份文件。
+                // 备份文件
                 backupOldConfig();
             }
         }
@@ -454,7 +523,11 @@ public class QuorumPeerConfig {
      * Backward compatibility -- It would backup static config file on bootup
      * if users write dynamic configuration in "zoo.cfg".
      */
+    /**
+     * 向后兼容性——如果用户在“zoo.cfg”中 设置了启用动态配置reconfigEnabled = true，则在启动时备份静态配置文件。
+     */
     private void backupOldConfig() throws IOException {
+        // 这个new对象的过程中，就把configFileStr对应的文件的内容 写入到了configFileStr.bak中（实现了文件的备份）
         new AtomicFileWritingIdiom(new File(configFileStr + ".bak"), new OutputStreamStatement() {
             @Override
             public void write(OutputStream output) throws IOException {
@@ -475,8 +548,16 @@ public class QuorumPeerConfig {
         });
     }
 
+
     /**
      * Writes dynamic configuration file
+     *
+     *  将qv中的信息，写入到dynamicConfigFilename文件中
+     *
+     * @param dynamicConfigFilename  生成的新文件
+     * @param qv 信息来源
+     * @param needKeepVersion
+     * @throws IOException
      */
     public static void writeDynamicConfig(final String dynamicConfigFilename,
                                           final QuorumVerifier qv,
@@ -487,9 +568,11 @@ public class QuorumPeerConfig {
             @Override
             public void write(Writer out) throws IOException {
                 Properties cfg = new Properties();
+                // qv串就是 zk集群中每个机器的ip:port:type用"\n"连接在一起
                 cfg.load( new StringReader(
                         qv.toString()));
 
+                // 将所有类似 "server.1=192.168.1.11:2888:3888" 这种配置写入out流
                 List<String> servers = new ArrayList<String>();
                 for (Entry<Object, Object> entry : cfg.entrySet()) {
                     String key = entry.getKey().toString().trim();
@@ -515,6 +598,12 @@ public class QuorumPeerConfig {
      * If it needs to erase client port information left by the old config,
      * "eraseClientPortAddress" should be set true.
      * It should also updates dynamic file pointer on reconfig.
+     */
+    /**
+     * 编辑静态配置文件。
+     * 如果在静态配置文件中有信息如：“server.X"， "group"，则删除它们。
+     * 如果需要删除静态配置文件中的client port信息，则“eraseClientPortAddress”应该设置为true。
+     * 更新静态配置文件中dynamicConfigFile的值。
      */
     public static void editStaticConfig(final String configFileStr,
                                         final String dynamicFileStr,
@@ -556,6 +645,7 @@ public class QuorumPeerConfig {
                             && (key.startsWith("clientPort")
                                 || key.startsWith("clientPortAddress")))) {
                         // not writing them back to static file
+                        // 这些配置不再写到静态配置文件中。
                         continue;
                     }
 
@@ -564,6 +654,7 @@ public class QuorumPeerConfig {
                 }
 
                 // updates the dynamic file pointer
+                // 将动态配置文件的路径写入out流
                 String dynamicConfigFilePath = PathUtils.normalizeFileSystemPath(dynamicFile.getCanonicalPath());
                 out.write("dynamicConfigFile="
                          .concat(dynamicConfigFilePath)
@@ -573,6 +664,7 @@ public class QuorumPeerConfig {
     }
 
 
+    // 删文件或者空目录（非空目录删不掉，也不抛出异常，就是调用delete后删不掉，试过）
     public static void deleteFile(String filename){
        if (filename == null) return;
        File f = new File(filename);
@@ -584,8 +676,11 @@ public class QuorumPeerConfig {
            }
        }                   
     }
-    
-    
+
+    /**
+     * 创建一个投票验证器
+     * 现在QuorumHierarchical层级验证器都不用了，只用QuorumMaj验证器
+     */
     private static QuorumVerifier createQuorumVerifier(Properties dynamicConfigProp, boolean isHierarchical) throws ConfigException{
        if(isHierarchical){
             return new QuorumHierarchical(dynamicConfigProp);
@@ -598,9 +693,12 @@ public class QuorumPeerConfig {
         }          
     }
 
+    // 设置当前对象的成员变量 quorumVerifier，serverId，clientPortAddress，peerType
     void setupQuorumPeerConfig(Properties prop, boolean configBackwardCompatibilityMode)
             throws IOException, ConfigException {
+        // 用入参prop中的配置项，构造一个投票验证器，赋值给成员变量quorumVerifier
         quorumVerifier = parseDynamicConfig(prop, electionAlg, true, configBackwardCompatibilityMode);
+        // 给成员变量serverId赋值，就是文件myid的内容
         setupMyId();
         setupClientPort();
         setupPeerType();
@@ -614,9 +712,14 @@ public class QuorumPeerConfig {
      * @throws IOException
      * @throws ConfigException
      */
+    // 用入参dynamicConfigProp中的配置项，构造一个投票验证器，并检验它的属性值后，返回。
     public static QuorumVerifier parseDynamicConfig(Properties dynamicConfigProp, int eAlg, boolean warnings,
 	   boolean configBackwardCompatibilityMode) throws IOException, ConfigException {
        boolean isHierarchical = false;
+        /**
+         * 看看配置的是不是层级验证器
+         * QuorumHierarchical层级验证器现在已经不用了，默认就是QuorumMaj验证器
+         */
         for (Entry<Object, Object> entry : dynamicConfigProp.entrySet()) {
             String key = entry.getKey().toString().trim();                    
             if (key.startsWith("group") || key.startsWith("weight")) {
@@ -626,17 +729,21 @@ public class QuorumPeerConfig {
                throw new ConfigException("Unrecognised parameter: " + key);                
             }
         }
-        
+
+        // 创建一个投票验证器，同时该验证器的成员变量也被赋上值了。
         QuorumVerifier qv = createQuorumVerifier(dynamicConfigProp, isHierarchical);
                
         int numParticipators = qv.getVotingMembers().size();
         int numObservers = qv.getObservingMembers().size();
+        // 对participant的数量做一个校验
         if (numParticipators == 0) {
+            // participant数量是0，若不是单机模式，则抛出异常。
             if (!standaloneEnabled) {
                 throw new IllegalArgumentException("standaloneEnabled = false then " +
                         "number of participants should be >0");
             }
             if (numObservers > 0) {
+                // 只有observer没有participant 是无效的配置。
                 throw new IllegalArgumentException("Observers w/o participants is an invalid configuration");
             }
         } else if (numParticipators == 1 && standaloneEnabled) {
@@ -654,14 +761,17 @@ public class QuorumPeerConfig {
                     LOG.warn("No server failure will be tolerated. " +
                         "You need at least 3 servers.");
                 } else if (numParticipators % 2 == 0) {
+                    // 非最优配置，考虑奇数个服务器
                     LOG.warn("Non-optimial configuration, consider an odd number of servers.");
                 }
             }
             /*
              * If using FLE, then every server requires a separate election
              * port.
+             * FLE（Fast Leader Election）
              */            
            if (eAlg != 0) {
+               // 所有参加选举的机器，都得有ip和选举用的端口，否则抛出异常。（配置得是这样： server.1=192.168.1.11:2888:3888）
                for (QuorumServer s : qv.getVotingMembers().values()) {
                    if (s.electionAddr == null)
                        throw new IllegalArgumentException(
@@ -672,6 +782,7 @@ public class QuorumPeerConfig {
         return qv;
     }
 
+    // 读取文件myid的内容，赋值给成员变量serverId
     private void setupMyId() throws IOException {
         File myIdFile = new File(dataDir, "myid");
         // standalone server doesn't need myid file.
@@ -694,16 +805,21 @@ public class QuorumPeerConfig {
         }
     }
 
+    // 给成员变量clientPortAddress赋值
     private void setupClientPort() throws ConfigException {
         if (serverId == UNSET_SERVERID) {
             return;
         }
         QuorumServer qs = quorumVerifier.getAllMembers().get(serverId);
+        // 这段感觉意思是： 不能在动态配置文件中更改静态配置文件中client的地址和端口，否则抛出异常。
         if (clientPortAddress != null && qs != null && qs.clientAddr != null) {
+            // 若clientPortAddress!=0.0.0.0 但是ip地址不同，则抛出异常
+            // 若clientPortAddress==0.0.0.0 但是端口不同，则抛出异常
             if ((!clientPortAddress.getAddress().isAnyLocalAddress()
                     && !clientPortAddress.equals(qs.clientAddr)) ||
                     (clientPortAddress.getAddress().isAnyLocalAddress()
                             && clientPortAddress.getPort() != qs.clientAddr.getPort()))
+                // 从这句可以看出， 当前对象的成员变量是从静态配置文件中读取， qs变量的属性是从动态配置文件中读取
                 throw new ConfigException("client address for this server (id = " + serverId +
                         ") in static config file is " + clientPortAddress +
                         " is different from client address found in dynamic file: " + qs.clientAddr);
@@ -711,6 +827,7 @@ public class QuorumPeerConfig {
         if (qs != null && qs.clientAddr != null) clientPortAddress = qs.clientAddr;
     }
 
+    // 设置成员变量peerType
     private void setupPeerType() {
         // Warn about inconsistent peer type
         LearnerType roleByServersList = quorumVerifier.getObservingMembers().containsKey(serverId) ? LearnerType.OBSERVER
@@ -724,6 +841,7 @@ public class QuorumPeerConfig {
         }
     }
 
+    // 检查几个必要的配置项
     public void checkValidity() throws IOException, ConfigException{
         if (isDistributed()) {
             if (initLimit == 0) {
@@ -790,6 +908,7 @@ public class QuorumPeerConfig {
 
     public long getServerId() { return serverId; }
 
+    // 是否集群，true是
     public boolean isDistributed() {
         return quorumVerifier!=null && (!standaloneEnabled || quorumVerifier.getVotingMembers().size() > 1);
     }

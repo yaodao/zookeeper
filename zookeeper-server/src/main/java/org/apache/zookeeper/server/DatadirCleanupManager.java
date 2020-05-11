@@ -46,12 +46,16 @@ public class DatadirCleanupManager {
 
     private PurgeTaskStatus purgeTaskStatus = PurgeTaskStatus.NOT_STARTED;
 
+    // 配置文件中的dataDir
     private final File snapDir;
 
+    // 配置文件中的dataLogDir
     private final File dataLogDir;
 
+    // 清理后需要保留的快照个数
     private final int snapRetainCount;
 
+    // 清理的周期（小时），默认是0，表示不清理
     private final int purgeInterval;
 
     private Timer timer;
@@ -60,13 +64,13 @@ public class DatadirCleanupManager {
      * Constructor of DatadirCleanupManager. It takes the parameters to schedule
      * the purge task.
      * 
-     * @param snapDir
+     * @param snapDir （dataDir）
      *            snapshot directory
      * @param dataLogDir
      *            transaction log directory
-     * @param snapRetainCount
+     * @param snapRetainCount 清理后需要保存的snapshots个数
      *            number of snapshots to be retained after purge
-     * @param purgeInterval
+     * @param purgeInterval 清理的周期（小时）
      *            purge interval in hours
      */
     public DatadirCleanupManager(File snapDir, File dataLogDir, int snapRetainCount,
@@ -91,19 +95,23 @@ public class DatadirCleanupManager {
      * 
      * @see PurgeTxnLog#purge(File, File, int)
      */
+    // 执行周期任务，清理日志文件和快照文件。
     public void start() {
         if (PurgeTaskStatus.STARTED == purgeTaskStatus) {
             LOG.warn("Purge task is already running.");
             return;
         }
         // Don't schedule the purge task with zero or negative purge interval.
+        // purgeInterval <= 0 表示不启动清理任务，默认是0
         if (purgeInterval <= 0) {
             LOG.info("Purge task is not scheduled.");
             return;
         }
 
         timer = new Timer("PurgeTask", true);
+        // 删除不需要保留的日志文件和快照文件。
         TimerTask task = new PurgeTask(dataLogDir, snapDir, snapRetainCount);
+        // 定期执行
         timer.scheduleAtFixedRate(task, 0, TimeUnit.HOURS.toMillis(purgeInterval));
 
         purgeTaskStatus = PurgeTaskStatus.STARTED;
@@ -123,8 +131,11 @@ public class DatadirCleanupManager {
     }
 
     static class PurgeTask extends TimerTask {
+        // 配置文件中的dataLogDir
         private File logsDir;
+        // 配置文件中的dataDir
         private File snapsDir;
+        // 清理后需要保留的快照个数
         private int snapRetainCount;
 
         public PurgeTask(File dataDir, File snapDir, int count) {
@@ -137,6 +148,7 @@ public class DatadirCleanupManager {
         public void run() {
             LOG.info("Purge task started.");
             try {
+                // 删除不需要保留的日志文件和快照文件。
                 PurgeTxnLog.purge(logsDir, snapsDir, snapRetainCount);
             } catch (Exception e) {
                 LOG.error("Error occurred while purging.", e);

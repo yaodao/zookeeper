@@ -30,6 +30,11 @@ import org.apache.zookeeper.server.quorum.QuorumPeer.QuorumServer;
  *
  */
 
+/**
+ * 验证器接口
+ * 所有的法定人数验证器（投票验证器）都必须实现一个名为containsQuorum的方法，
+ * 该方法将验证入参HashSet中的服务器id数量，是否达到了法定人数。（这里的quorum 意思是 (通过决议时所需的)法定人数，可以意会下）
+ */
 public interface QuorumVerifier {
     long getWeight(long id);
     boolean containsQuorum(Set<Long> set);

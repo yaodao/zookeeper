@@ -134,9 +134,12 @@ public class Util {
      * @param prefix the file name prefix (snapshot or log)
      * @return zxid
      */
+    // 从文件名name中取zxid。
+    // （文件名是使用 makeLogName(long) 或者 makeSnapshotName(long)方法创建的。）
     public static long getZxidFromName(String name, String prefix) {
         long zxid = -1;
         String nameParts[] = name.split("\\.");
+        // 文件名前半部分与前缀相同，则取zxid
         if (nameParts.length == 2 && nameParts[0].equals(prefix)) {
             try {
                 zxid = Long.parseLong(nameParts[1], 16);
@@ -254,6 +257,9 @@ public class Util {
     /**
      * Compare file file names of form "prefix.version". Sort order result
      * returned in order of version.
+     *
+     * 给文件排序。
+     * 比较"prefix.version"这种形式的文件名，按version排序。（这里的version是指文件名中的zxid）
      */
     private static class DataDirFileComparator
         implements Comparator<File>, Serializable
@@ -267,10 +273,14 @@ public class Util {
             this.ascending = ascending;
         }
 
+        // 比较o1和o2的zxid，若升序排列，则zxid大的在后面。
         public int compare(File o1, File o2) {
+            // 取o1和o2文件名中的zxid，分别为z1，z2
             long z1 = Util.getZxidFromName(o1.getName(), prefix);
             long z2 = Util.getZxidFromName(o2.getName(), prefix);
+            // 若z1<z2，则返回-1； 若z1>z2，则返回1，相等返回0
             int result = z1 < z2 ? -1 : (z1 > z2 ? 1 : 0);
+
             return ascending ? result : -result;
         }
     }
@@ -279,11 +289,15 @@ public class Util {
      * Sort the list of files. Recency as determined by the version component
      * of the file name.
      *
+     * 对数组中的文件进行排序， 按文件名中的version串进行排序。（这里的version串，指的是文件名中的zxid）
+     *
      * @param files array of files
      * @param prefix files not matching this prefix are assumed to have a
      * version = -1)
+     *               文件名与前缀不匹配的，认为该文件名中的version是-1
      * @param ascending true sorted in ascending order, false results in
      * descending order
+     *                  true 则升序排列结果， false 则降序排列结果。
      * @return sorted input files
      */
     public static List<File> sortDataDir(File[] files, String prefix, boolean ascending)
@@ -291,6 +305,7 @@ public class Util {
         if(files==null)
             return new ArrayList<File>(0);
         List<File> filelist = Arrays.asList(files);
+        // 对filelist中的文件进行排序（按文件名中的zxid的大小进行排序，ascending=false表示降序排列）
         Collections.sort(filelist, new DataDirFileComparator(prefix, ascending));
         return filelist;
     }
@@ -301,6 +316,7 @@ public class Util {
      * @param fileName
      * @return
      */
+    // 若文件名以"log."开头，则返回true
     public static boolean isLogFileName(String fileName) {
         return fileName.startsWith(FileTxnLog.LOG_FILE_PREFIX + ".");
     }
@@ -311,6 +327,7 @@ public class Util {
      * @param fileName
      * @return
      */
+    // 若文件名以 "snapshot."开头，则返回true
     public static boolean isSnapshotFileName(String fileName) {
         return fileName.startsWith(FileSnap.SNAPSHOT_FILE_PREFIX + ".");
     }

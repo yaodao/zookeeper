@@ -108,6 +108,7 @@ public class PathUtils {
      *            file path
      * @return converted file path
      */
+    // 将windows下的路径转成Unix下的路径
     public static String normalizeFileSystemPath(String path) {
         if (path != null) {
             String osname = java.lang.System.getProperty("os.name");

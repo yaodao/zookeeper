@@ -176,13 +176,16 @@ public class FileSnap implements SnapShot {
      * @return the last n snapshots
      * @throws IOException
      */
+    // 取最近的n个snapshot文件（snapshot可能无效，因为并没有对snapshot文件做校验）
     public List<File> findNRecentSnapshots(int n) throws IOException {
+        // 对数组files中的文件进行排序（按文件名中的zxid的大小,降序排列）
         List<File> files = Util.sortDataDir(snapDir.listFiles(), SNAPSHOT_FILE_PREFIX, false);
         int count = 0;
         List<File> list = new ArrayList<File>();
         for (File f: files) {
             if (count == n)
                 break;
+            // 取文件名name中的zxid，过滤掉zxid=-1的文件
             if (Util.getZxidFromName(f.getName(), SNAPSHOT_FILE_PREFIX) != -1) {
                 count++;
                 list.add(f);

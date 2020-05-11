@@ -251,11 +251,21 @@ public class FileTxnLog implements TxnLog, Closeable {
      * @param snapshotZxid return files at, or before this zxid
      * @return
      */
+    /**
+     * 取日志文件
+     * 查找在快照处或快照之前的那个日志文件。并返回此日志和所有后续日志。结果按文件的zxid排序，升序排列。
+     *
+     * @param logDirList 日志所在文件夹
+     * @param snapshotZxid 需要保留的那些快照文件中，文件名字中最小的zxid串
+     * @return
+     */
     public static File[] getLogFiles(File[] logDirList,long snapshotZxid) {
+        // 按文件名中的zxid，来升序排列logDirList中的文件。
         List<File> files = Util.sortDataDir(logDirList, LOG_FILE_PREFIX, true);
         long logZxid = 0;
         // Find the log file that starts before or at the same time as the
         // zxid of the snapshot
+        // 查找一个zxid， 它与snapshotZxid相同或者最接近该snapshotZxid（从左到右接近zxid）
         for (File f : files) {
             long fzxid = Util.getZxidFromName(f.getName(), LOG_FILE_PREFIX);
             if (fzxid > snapshotZxid) {
@@ -263,11 +273,13 @@ public class FileTxnLog implements TxnLog, Closeable {
             }
             // the files
             // are sorted with zxid's
+            // 查找最接近snapshotZxid的那个fzxid，并赋值给logZxid （从左到右接近snapshotZxid）
             if (fzxid > logZxid) {
                 logZxid = fzxid;
             }
         }
         List<File> v=new ArrayList<File>(5);
+        // 将日志文件名字中的zxid最接近snapshotZxid的那个日志文件，及它之后的日志文件都添加到list
         for (File f : files) {
             long fzxid = Util.getZxidFromName(f.getName(), LOG_FILE_PREFIX);
             if (fzxid < logZxid) {

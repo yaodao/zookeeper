@@ -186,6 +186,7 @@ public class ZKConfig {
      * @param key
      * @param value
      */
+    // 将（key，value）添加到成员变量properties
     public void setProperty(String key, String value) {
         if (null == key) {
             throw new IllegalArgumentException("property key is null.");
@@ -205,6 +206,7 @@ public class ZKConfig {
      * @param configFile
      *            Configuration file.
      */
+    // 使用入参configFile中的配置项，覆盖成员变量properties中已经有的entry
     public void addConfiguration(File configFile) throws ConfigException {
         LOG.info("Reading configuration from: {}", configFile.getAbsolutePath());
         try {
@@ -217,6 +219,7 @@ public class ZKConfig {
             } finally {
                 in.close();
             }
+            // 根据cfg，更新成员变量properties中的（key，value）
             parseProperties(cfg);
         } catch (IOException | IllegalArgumentException e) {
             LOG.error("Error while configuration from: {}", configFile.getAbsolutePath(), e);
@@ -231,10 +234,12 @@ public class ZKConfig {
      * @param configPath
      *            Configuration file path.
      */
+    // 使用入参configPath文件中的配置项，覆盖成员变量properties中已经有的entry
     public void addConfiguration(String configPath) throws ConfigException {
         addConfiguration(new File(configPath));
     }
 
+    // 根据入参cfg，更新成员变量properties中的（key，value）
     private void parseProperties(Properties cfg) {
         for (Entry<Object, Object> entry : cfg.entrySet()) {
             String key = entry.getKey().toString().trim();

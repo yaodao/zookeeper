@@ -143,18 +143,24 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
     }
 
     public static class QuorumServer {
+        // 该对象中存放server的ip地址和端口， 其中端口是该server与leader通信的端口。
         public InetSocketAddress addr = null;
 
+        // 该对象中存放server的ip地址和端口， 其中端口是用于重新选举的通信端口
         public InetSocketAddress electionAddr = null;
-        
+
+        // 记录客户端的ip和端口
         public InetSocketAddress clientAddr = null;
-        
+
+        // 就是myid文件中的值
         public long id;
 
         public String hostname;
-        
+
+        // 当前QuorumServer对象的角色
         public LearnerType type = LearnerType.PARTICIPANT;
-        
+
+        // 存放以上地址对象中的有效地址对象
         private List<InetSocketAddress> myAddrs;
 
         public QuorumServer(long id, InetSocketAddress addr,
@@ -182,6 +188,13 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
          * If the DNS lookup fails, this.addr and electionAddr remain
          * unmodified.
          */
+        /**
+         * 通过hostname查找ip，之后给addr和electionAddr这两个InetSocketAddress对象重新赋值
+         * 我个人认为，这个函数是应对，hostname不变，ip地址变化的情况。
+         * 即，当ip地址变化时，调用这个函数会将更改后的ip地址，重新赋值给成员变量addr和electionAddr
+         * 例如：集群的机器ip地址是自动获取的，某天换了网段，那所有机器的ip地址都变化了，但是hostname都不变
+         *
+         */
         public void recreateSocketAddresses() {
             if (this.addr == null) {
                 LOG.warn("Server address has not been initialized");
@@ -191,14 +204,20 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                 LOG.warn("Election address has not been initialized");
                 return;
             }
+            // 取hostname（就是hosts文件里的名字，若没有则取ip地址）
             String host = this.addr.getHostString();
             InetAddress address = null;
             try {
+                // 根据hostname确定ip
+                // （我个人认为，这个是应对，hostname不变，ip地址变化的情况。例如：集群的机器ip地址是自动获取的，某天换了网段，那所有机器的ip地址都变化了，但是hostname都不变）
                 address = InetAddress.getByName(host);
             } catch (UnknownHostException ex) {
                 LOG.warn("Failed to resolve address: {}", host, ex);
                 return;
             }
+
+            // 下面重新给addr和electionAddr这两个InetSocketAddress对象赋值，因为上面的ip地址有可能改变了。
+
             LOG.debug("Resolved address for {}: {}", host, address);
             int port = this.addr.getPort();
             this.addr = new InetSocketAddress(address, port);
@@ -206,6 +225,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
             this.electionAddr = new InetSocketAddress(address, port);
         }
 
+        // 设置server的角色
         private void setType(String s) throws ConfigException {
             if (s.toLowerCase().equals("observer")) {
                type = LearnerType.OBSERVER;
@@ -216,21 +236,36 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
             }
         }
 
+        /**
+         * 输入串只能是 "server_config" 或者是 "server_config;client_config" 的形式
+         * 其中，
+         * server_config是 "host:port:port" 或者 "host:port:port:type" 这样的串
+         * client_config是 "port" 或者 "host:port" 这样的串
+         */
         private static final String wrongFormat = " does not have the form server_config or server_config;client_config"+
         " where server_config is host:port:port or host:port:port:type and client_config is port or host:port";
 
+
+        /**
+         * 通过解析addressStr串给QuorumServer对象的成员变量赋值
+         *
+         * 入参addressStr示例： "127.0.0.1:1234:1236:participant;1.2.3.4:1237"
+         */
         public QuorumServer(long sid, String addressStr) throws ConfigException {
-            // LOG.warn("sid = " + sid + " addressStr = " + addressStr);
             this.id = sid;
+            // 将入参分成两部分，server串和client串
             String serverClientParts[] = addressStr.split(";");
+
+            // 将server串"host:port:port:type" 拆分成数组
             String serverParts[] = ConfigUtils.getHostAndPort(serverClientParts[0]);
+            // 数组serverParts的长度只能是3或者4，否则抛出异常。（也就是server串只能是 "host:port:port:type" 或者 "host:port:port"）
             if ((serverClientParts.length > 2) || (serverParts.length < 3)
                     || (serverParts.length > 4)) {
                 throw new ConfigException(addressStr + wrongFormat);
             }
 
+            // 将client串"host:port" 拆分成数组
             if (serverClientParts.length == 2) {
-                //LOG.warn("ClientParts: " + serverClientParts[1]);
                 String clientParts[] = ConfigUtils.getHostAndPort(serverClientParts[1]);
                 if (clientParts.length > 2) {
                     throw new ConfigException(addressStr + wrongFormat);
@@ -239,6 +274,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                 // is client_config a host:port or just a port
                 hostname = (clientParts.length == 2) ? clientParts[0] : "0.0.0.0";
                 try {
+                    // 给成员变量clientAddr赋值
                     clientAddr = new InetSocketAddress(hostname,
                             Integer.parseInt(clientParts[clientParts.length - 1]));
                     //LOG.warn("Set clientAddr to " + clientAddr);
@@ -247,14 +283,19 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                 }
             }
 
+
+            // 以上把server串给拆分成数组了，下面使用这个数组里的元素。
+
             // server_config should be either host:port:port or host:port:port:type
             try {
+                // server的ip地址和端口， 该端口是与leader通信的端口。
                 addr = new InetSocketAddress(serverParts[0],
                         Integer.parseInt(serverParts[1]));
             } catch (NumberFormatException e) {
                 throw new ConfigException("Address unresolved: " + serverParts[0] + ":" + serverParts[1]);
             }
             try {
+                // server的ip地址和端口， 该端口是用于重新选举的通信端口
                 electionAddr = new InetSocketAddress(serverParts[0],
                         Integer.parseInt(serverParts[2]));
             } catch (NumberFormatException e) {
@@ -266,15 +307,18 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                         "Client and election port must be different! Please update the configuration file on server." + sid);
             }
 
+            // 若server串里有角色信息，则设置server的角色
             if (serverParts.length == 4) {
                 setType(serverParts[3]);
             }
 
             this.hostname = serverParts[0];
-            
+
+            // 过滤掉无效的地址对象
             setMyAddrs();
         }
 
+        // QuorumServer的构造函数
         public QuorumServer(long id, InetSocketAddress addr,
                     InetSocketAddress electionAddr, LearnerType type) {
             this(id, addr, electionAddr, (InetSocketAddress)null, type);
@@ -288,9 +332,11 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
             this.type = type;
             this.clientAddr = clientAddr;
 
+            // 过滤掉无效的地址对象
             setMyAddrs();
         }
 
+        // 过滤掉无效的地址对象，把有效的添加到myAddrs
         private void setMyAddrs() {
             this.myAddrs = new ArrayList<InetSocketAddress>();
             this.myAddrs.add(this.addr);
@@ -299,9 +345,12 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
             this.myAddrs = excludedSpecialAddresses(this.myAddrs);
         }
 
+        // 返回入参addr中的hostname或者ip地址
         private static String delimitedHostString(InetSocketAddress addr)
         {
+            // 取hostname或者ip地址
             String host = addr.getHostString();
+            // host是ipv6地址
             if (host.contains(":")) {
                 return "[" + host + "]";
             } else {
@@ -309,9 +358,17 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
             }
         }
 
+
+
+        /**
+         * 返回 "host:port1:port2:type;clienthost:port" 这样的串
+         *
+         * 例如： "127.0.0.1:1234:1236:participant;1.2.3.4:1237"
+         */
         public String toString(){
             StringWriter sw = new StringWriter();
             //addr should never be null, but just to make sure
+            // 组成串 "host:port1:port2:type"
             if (addr !=null) {
                 sw.append(delimitedHostString(addr));
                 sw.append(":");
@@ -322,7 +379,9 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                 sw.append(String.valueOf(electionAddr.getPort()));
             }           
             if (type == LearnerType.OBSERVER) sw.append(":observer");
-            else if (type == LearnerType.PARTICIPANT) sw.append(":participant");            
+            else if (type == LearnerType.PARTICIPANT) sw.append(":participant");
+
+            // 组成串 ";host:port"
             if (clientAddr!=null){
                 sw.append(";");
                 sw.append(delimitedHostString(clientAddr));
@@ -336,14 +395,16 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
           assert false : "hashCode not designed";
           return 42; // any arbitrary constant will do 
         }
-        
+
+        // 比较两个入参是否相等。比的是内部属性是否相等。
         private boolean checkAddressesEqual(InetSocketAddress addr1, InetSocketAddress addr2){
             if ((addr1 == null && addr2!=null) ||
                 (addr1!=null && addr2==null) ||
                 (addr1!=null && addr2!=null && !addr1.equals(addr2))) return false;
             return true;
         }
-        
+
+        // 比较当前类的对象是否相等。比的是类内部的属性是否相等。
         public boolean equals(Object o){
             if (!(o instanceof QuorumServer)) return false;
             QuorumServer qs = (QuorumServer)o;          
@@ -354,6 +415,8 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
             return true;
         }
 
+        // 检验两个QuorumServer对象，若地址相同，则抛出异常
+        // 也就是说任意两个QuorumServer对象的地址是不同的。（这里的地址就是ip地址 或者 hostname）
         public void checkAddressDuplicate(QuorumServer s) throws BadArgumentsException {
             List<InetSocketAddress> otherAddrs = new ArrayList<InetSocketAddress>();
             otherAddrs.add(s.addr);
@@ -372,8 +435,10 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
             }
         }
 
+        // 将入参中ip地址为  "0.0.0.0"和"127.0.0.1"的对象过滤掉，返回剩下的。
         private List<InetSocketAddress> excludedSpecialAddresses(List<InetSocketAddress> addrs) {
             List<InetSocketAddress> included = new ArrayList<InetSocketAddress>();
+            // ip地址是 "0.0.0.0"， 端口是0
             InetAddress wcAddr = new InetSocketAddress(0).getAddress();
 
             for (InetSocketAddress addr : addrs) {
@@ -383,8 +448,8 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                 InetAddress inetaddr = addr.getAddress();
 
                 if (inetaddr == null ||
-                    inetaddr.equals(wcAddr) || // wildCard address(0.0.0.0)
-                    inetaddr.isLoopbackAddress()) { // loopback address(localhost/127.0.0.1)
+                    inetaddr.equals(wcAddr) || // wildCard address(0.0.0.0) ， 这里的equal比较的是ip串
+                    inetaddr.isLoopbackAddress()) { // loopback address(localhost/127.0.0.1) 就是当inetaddr中hostname的是"localhost"或"127.0.0.1"时，返回true
                     continue;
                 }
                 included.add(addr);

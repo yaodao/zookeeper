@@ -38,6 +38,10 @@ public class IOUtils {
      * @param stream
      *            the Stream to close
      */
+    /**
+     * 关闭入参stream，并忽略关闭过程中出现的IOException
+     * 该函数必须只用在异常处理程序（块）中，用于清理资源。
+     */
     public static void closeStream(Closeable stream) {
         cleanup(null, stream);
     }
@@ -50,6 +54,10 @@ public class IOUtils {
      *            the log to record problems to at debug level. Can be null.
      * @param closeables
      *            the objects to close
+     */
+    /**
+     * 关闭那些实现了Closeable接口的对象，并忽略关闭过程中出现的IOException或空指针。
+     * 该函数必须只用于异常处理程序（块）中，用于清理资源。
      */
     public static void cleanup(Logger log, Closeable... closeables) {
         for (Closeable c : closeables) {
